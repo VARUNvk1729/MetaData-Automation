@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import streamlit as st
 import chardet
-import io
+import re
 
 def looks_like_file(name):
     if '.' not in name:
@@ -10,18 +10,18 @@ def looks_like_file(name):
     ext = os.path.splitext(name)[1][1:]
     return ext.isalpha() or (len(ext) <= 5 and not ext.isdigit())
 
-def process_paths(file_buffer, filter_files=False):
-    raw_data = file_buffer.read()
-    detected_encoding = chardet.detect(raw_data)['encoding']
-    encoding = detected_encoding if detected_encoding else 'utf-8'
+def process_paths(file_path, filter_files=False):
+    with open(file_path, 'rb') as f:
+        raw_data = f.read()
+        detected_encoding = chardet.detect(raw_data)['encoding']
+        encoding = detected_encoding if detected_encoding else 'utf-8'
 
     if encoding.lower() != 'utf-8':
         st.warning(f"⚠️ The uploaded file is not UTF-8 encoded. Detected encoding: {encoding}")
 
     try:
-        file_buffer.seek(0)
-        text_data = file_buffer.read().decode(encoding)
-        paths = [line.strip() for line in text_data.splitlines()]
+        with open(file_path, 'r', encoding=encoding) as f:
+            paths = [line.strip() for line in f.readlines()]
     except UnicodeDecodeError:
         st.error(f"❌ Failed to decode file with encoding: {encoding}.")
         return pd.DataFrame()
@@ -30,11 +30,13 @@ def process_paths(file_buffer, filter_files=False):
     max_depth = 0
 
     for path in paths:
-        drive, tail = os.path.splitdrive(path)
-        if not drive:
-            drive = 'No Drive'
+        if ":" in path:
+            drive, tail = path.split(":", 1)
+            drive += ":"
+        else:
+            drive, tail = 'No Drive', path
 
-        components = [c for c in tail.split(os.sep) if c]
+        components = [c for c in re.split(r"[\\/]+", tail) if c]
         if not components:
             continue
 
@@ -109,20 +111,23 @@ st.markdown("Upload a `.txt` file containing file/folder paths. You can choose t
 uploaded_file = st.file_uploader("🔼 Upload a text file", type=["txt"])
 
 if uploaded_file:
-    file_buffer = io.BytesIO(uploaded_file.getbuffer())
+    temp_file = "uploaded_paths.txt"
+    with open(temp_file, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
     filter_files = st.checkbox("🗂 Show only paths containing file names")
-    df = process_paths(file_buffer, filter_files=filter_files)
+    df = process_paths(temp_file, filter_files=filter_files)
 
     st.markdown("### 📋 Processed Output")
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        output = io.BytesIO()
-        df.to_excel(output, index=False, engine='openpyxl')
+        output_file = "processed_paths.xlsx"
+        df.to_excel(output_file, index=False, engine='openpyxl')
+
         st.download_button(
             label="📥 Download Excel",
-            data=output.getvalue(),
+            data=open(output_file, "rb"),
             file_name="processed_paths.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )

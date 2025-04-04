@@ -17,7 +17,7 @@ def process_paths(file_path, filter_files=False):
         encoding = detected_encoding if detected_encoding else 'utf-8'
 
     if encoding.lower() != 'utf-8':
-        st.warning(f"⚠️ The uploaded file is not UTF-8 encoded. Detected encoding: {encoding}")
+        st.warning(f"⚠️If you get any error then make text file as utf-8 and re-upload. Detected encoding: {encoding}")
 
     try:
         with open(file_path, 'r', encoding=encoding) as f:

@@ -3,17 +3,26 @@ import pandas as pd
 import streamlit as st
 import chardet
 
+def looks_like_file(name):
+    if '.' not in name:
+        return False
+    ext = os.path.splitext(name)[1][1:]
+    return ext.isalpha() or (len(ext) <= 5 and not ext.isdigit())
+
 def process_paths(file_path, filter_files=False):
     with open(file_path, 'rb') as f:
         raw_data = f.read()
         detected_encoding = chardet.detect(raw_data)['encoding']
         encoding = detected_encoding if detected_encoding else 'utf-8'
 
+    if encoding.lower() != 'utf-8':
+        st.warning(f"⚠️ The uploaded file is not UTF-8 encoded. Detected encoding: {encoding}")
+
     try:
         with open(file_path, 'r', encoding=encoding) as f:
             paths = [line.strip() for line in f.readlines()]
     except UnicodeDecodeError:
-        st.error(f"Failed to decode file with detected encoding: {encoding}.")
+        st.error(f"❌ Failed to decode file with encoding: {encoding}.")
         return pd.DataFrame()
 
     data = []
@@ -28,14 +37,15 @@ def process_paths(file_path, filter_files=False):
         if not components:
             continue
 
-        file_exts = ['.pdf', '.docx', '.xlsx', '.txt', '.png', '.jpg', '.jpeg', '.zip', '.rar', '.csv']
-        file_name = components[-1] if any(components[-1].lower().endswith(ext) for ext in file_exts) else None
+        last = components[-1]
+        is_file = looks_like_file(last)
+        file_name = last if is_file else None
 
         if filter_files and not file_name:
             continue
 
-        folders = components[:-1] if file_name else components
-        folder_path = os.path.join(drive, *components)
+        folders = components[:-1] if is_file else components
+        folder_path = os.path.join(drive, *folders, file_name) if file_name else os.path.join(drive, *folders)
         max_depth = max(max_depth, len(folders))
         data.append((drive, folders, file_name, folder_path))
 
@@ -47,7 +57,51 @@ def process_paths(file_path, filter_files=False):
 
     return pd.DataFrame(processed_data, columns=columns)
 
+# Streamlit UI
 st.set_page_config(page_title="Metadata Automation", layout="centered")
+
+st.markdown("""
+    <style>
+        .main {
+            background-color: #f9f9fb;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.08);
+        }
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        h1, h2, h3 {
+            color: #003366;
+        }
+        .stButton>button {
+            background-color: #003366;
+            color: white;
+            border-radius: 8px;
+            padding: 0.6em 1.2em;
+            border: none;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+        }
+        .stDownloadButton>button {
+            background-color: #28a745;
+            color: white;
+            border-radius: 8px;
+            padding: 0.6em 1.2em;
+            border: none;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+        }
+        .stDataFrame {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("<div class='main'>", unsafe_allow_html=True)
+
 st.markdown("## 📁 METADATA AUTOMATION")
 st.markdown("Upload a `.txt` file containing file/folder paths. You can choose to filter only file paths.")
 
@@ -74,3 +128,5 @@ if uploaded_file:
             file_name="processed_paths.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+st.markdown("</div>", unsafe_allow_html=True)

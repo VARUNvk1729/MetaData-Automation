@@ -47,8 +47,8 @@ def process_paths(file_path, filter_files=False):
 
     return pd.DataFrame(processed_data, columns=columns)
 
-st.set_page_config(page_title="Path Categorizer", layout="centered")
-st.markdown("## 📁 METADATA CATEGORISATION")
+st.set_page_config(page_title="Metadata Automation", layout="centered")
+st.markdown("## 📁 METADATA AUTOMATION")
 st.markdown("Upload a `.txt` file containing file/folder paths. You can choose to filter only file paths.")
 
 uploaded_file = st.file_uploader("🔼 Upload a text file", type=["txt"])
